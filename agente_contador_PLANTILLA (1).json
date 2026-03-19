@@ -1,0 +1,947 @@
+{
+  "name": "agente_contador",
+  "nodes": [
+    {
+      "parameters": {
+        "resource": "file",
+        "fileId": "={{ $json.file_id }}",
+        "additionalFields": {}
+      },
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        336,
+        16
+      ],
+      "id": "58581724-84b3-41bf-bf9b-c95f986dc8b6",
+      "name": "Get a file"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "753386e4-7d42-4259-bdd9-34527c1ed8e7",
+              "name": "file_id",
+              "value": "={{ $json.message?.voice?.file_id    || ($json.message?.photo?.length ? $json.message.photo[$json.message.photo.length - 1].file_id : '')    || $json.message?.audio?.file_id    || $json.message?.document?.file_id    || '' }}",
+              "type": "string"
+            },
+            {
+              "id": "4103fee4-e718-4797-b43c-f6fe4bccbd3a",
+              "name": "tipo_manesaje",
+              "value": "={{ $json.message?.voice    ? 'voice'    : ($json.message?.photo?.length        ? 'image'        : ($json.message?.text ? 'text' : 'unknown')) }}",
+              "type": "string"
+            },
+            {
+              "id": "f14f99ef-5020-4f8c-96f6-679c15d024d7",
+              "name": "text_raw",
+              "value": "={{ $json.message?.text || $json.message?.caption || '' }}",
+              "type": "string"
+            },
+            {
+              "id": "013adc0d-13d0-4b75-aaf4-b08c8d125099",
+              "name": "chat_id",
+              "value": "={{ $json.message.chat.id }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        -80,
+        224
+      ],
+      "id": "16e43c0d-d5df-42bd-96b7-35636e9913ad",
+      "name": "Edit Fields"
+    },
+    {
+      "parameters": {
+        "resource": "image",
+        "operation": "analyze",
+        "modelId": {
+          "__rl": true,
+          "value": "gpt-4o",
+          "mode": "list",
+          "cachedResultName": "GPT-4O"
+        },
+        "text": "=Devuelve **SOLO** un **JSON** (sin backticks, sin texto extra, sin markdown). Estructura y reglas:\n\n{\n  \"proveedor\": string,                  // nombre comercial o razón social\n  \"fecha\": \"YYYY-MM-DD\" | \"\",           // si no aparece clara, devuelve \"\" (no inventes)\n  \"concepto\": string,                   // descripción corta del ticket\n  \"subtotal\": number,                   // usa punto decimal\n  \"iva\": number,\n  \"total\": number,\n  \"moneda\": \"MXN\" | \"USD\",\n  \"metodo_pago\": \"efectivo\" | \"tarjeta\" | \"transferencia\" | \"desconocido\",\n  \"categoria\": string                   // una de: comidas, transporte, software, hospedaje, oficina, servicios, combustible, salud, educación, otros\n}\n\nReglas:\n- Si no hay desglose, estima: subtotal ≈ total/1.16 y iva = total - subtotal.\n- Usa punto decimal; redondea a 2 decimales.\n- No incluyas texto adicional fuera del JSON. No uses markdown ni ```.\n- Si dudas de un campo textual, devuelve la mejor aproximación; si una fecha no es clara, deja \"\".\n",
+        "inputType": "base64",
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.openAi",
+      "typeVersion": 1.8,
+      "position": [
+        512,
+        16
+      ],
+      "id": "120c24d3-31d6-4f70-94c3-352584cc6afc",
+      "name": "Analyze image"
+    },
+    {
+      "parameters": {
+        "jsCode": "let raw = $json.text || $json.output || $json.content || '';\n// Limpia posibles fences accidentalmente devueltos\nraw = raw.replace(/^```json\\s*/i, '').replace(/```$/i, '').trim();\n\n// Si vino envuelto como [{\"content\":\"...\"}]\nif (!raw && Array.isArray(items) && items[0]?.json?.content) {\n  raw = items[0].json.content.replace(/^```json\\s*/i, '').replace(/```$/i, '').trim();\n}\n\nlet d;\ntry {\n  d = JSON.parse(raw);\n} catch (e) {\n  // Fallback: intenta extraer el primer objeto {...}\n  const m = raw.match(/\\{[\\s\\S]*\\}/);\n  if (!m) throw new Error('No JSON found in LLM output');\n  d = JSON.parse(m[0]);\n}\n\nreturn [{ json: d }];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        672,
+        16
+      ],
+      "id": "79cf2d3e-f1ca-481e-b273-26a78cef5b12",
+      "name": "Code"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "0706ecbd-1dd9-45cd-a308-d4783722a57b",
+              "name": "webViewLink",
+              "value": "={{ $json.webViewLink }}",
+              "type": "string"
+            },
+            {
+              "id": "b1014feb-39aa-4bed-90ae-b0312f777320",
+              "name": "proveedor",
+              "value": "={{ $('Code').item.json.proveedor }}",
+              "type": "string"
+            },
+            {
+              "id": "be8a7b66-6d37-4c4c-ad3b-b64ca5dc032c",
+              "name": "fecha",
+              "value": "={{ $('Code').item.json.fecha }}",
+              "type": "string"
+            },
+            {
+              "id": "db92e233-b903-4054-8edd-9384bc017d8e",
+              "name": "concepto",
+              "value": "={{ $('Code').item.json.concepto }}",
+              "type": "string"
+            },
+            {
+              "id": "b05021bb-eb70-42f6-97af-cd844d697c10",
+              "name": "subtotal",
+              "value": "={{ $('Code').item.json.subtotal }}",
+              "type": "number"
+            },
+            {
+              "id": "98a7dbc3-3771-4bcc-922e-fe7738ec2b63",
+              "name": "iva",
+              "value": "={{ $('Code').item.json.iva }}",
+              "type": "number"
+            },
+            {
+              "id": "7d3de9eb-55de-47b4-ba05-a07dcf1dd706",
+              "name": "total",
+              "value": "={{ $('Code').item.json.total }}",
+              "type": "number"
+            },
+            {
+              "id": "58d5d24f-b9e6-466a-92b5-cd99c36dee07",
+              "name": "moneda",
+              "value": "={{ $('Code').item.json.moneda }}",
+              "type": "string"
+            },
+            {
+              "id": "bbdcf982-873c-45be-91dc-8e7bc477782c",
+              "name": "metodo_pago",
+              "value": "={{ $('Code').item.json.metodo_pago }}",
+              "type": "string"
+            },
+            {
+              "id": "a8493b37-6262-4b86-a5c3-046e16c66726",
+              "name": "categoria",
+              "value": "={{ $('Code').item.json.categoria }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        1696,
+        -80
+      ],
+      "id": "c07c28aa-1009-4200-a40b-0882b4f96ce9",
+      "name": "Edit Fields1"
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "value": "YOUR_SPREADSHEET_ID",
+          "mode": "list",
+          "cachedResultName": "Tu_Google_Sheet",
+          "cachedResultUrl": ""
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "gid=0",
+          "mode": "list",
+          "cachedResultName": "Hoja 1",
+          "cachedResultUrl": ""
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "fecha": "={{ $json.fecha }}",
+            "proveedor": "={{ $json.proveedor }}",
+            "concepto": "={{ $json.concepto }}",
+            "categoria": "={{ $json.categoria }}",
+            "subtotal": "={{ $json.subtotal }}",
+            "iva": "={{ $json.iva }}",
+            "total": "={{ $json.total }}",
+            "moneda": "={{ $json.moneda }}",
+            "metodo_pago": "={{ $json.metodo_pago }}",
+            "enlace_ticket": "={{ $json.webViewLink }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "fecha",
+              "displayName": "fecha",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "proveedor",
+              "displayName": "proveedor",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "concepto",
+              "displayName": "concepto",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "categoria",
+              "displayName": "categoria",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "subtotal",
+              "displayName": "subtotal",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "iva",
+              "displayName": "iva",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "total",
+              "displayName": "total",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "moneda",
+              "displayName": "moneda",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "metodo_pago",
+              "displayName": "metodo_pago",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "enlace_ticket",
+              "displayName": "enlace_ticket",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        1904,
+        -80
+      ],
+      "id": "d6b45909-052c-46a0-aba2-a765ffdbb6b0",
+      "name": "Append row in sheet"
+    },
+    {
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.tipo_manesaje }}",
+                    "rightValue": "image",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    },
+                    "id": "7d186a02-946e-4fdd-9d80-f6a823c64d74"
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "Imagen"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "id": "1f35c718-e8c7-4c85-a01e-fd80e2930e17",
+                    "leftValue": "={{ $json.tipo_manesaje }}",
+                    "rightValue": "text",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals",
+                      "name": "filter.operator.equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "Texto"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.2,
+      "position": [
+        176,
+        224
+      ],
+      "id": "a0c5d276-d621-4398-adc7-2335d4a0f5b0",
+      "name": "Switch"
+    },
+    {
+      "parameters": {
+        "chatId": "={{ $('Telegram Trigger').item.json.message.chat.id }}",
+        "text": "Tu registro fue un exito",
+        "additionalFields": {
+          "appendAttribution": false
+        }
+      },
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        2096,
+        -80
+      ],
+      "id": "591ab62c-fa10-489f-832f-bfe51bec9ab4",
+      "name": "Send a text message"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 1
+          },
+          "conditions": [
+            {
+              "id": "cond-resumen",
+              "leftValue": "={{ $json.text_raw }}",
+              "rightValue": "resumen",
+              "operator": {
+                "type": "string",
+                "operation": "contains"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "fc065180-eb21-4852-ae14-1f96e9ad072d",
+      "name": "¿Es petición de resumen?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        448,
+        240
+      ]
+    },
+    {
+      "parameters": {
+        "documentId": {
+          "__rl": true,
+          "value": "YOUR_SPREADSHEET_ID",
+          "mode": "list",
+          "cachedResultName": "Tu_Google_Sheet",
+          "cachedResultUrl": ""
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "gid=0",
+          "mode": "list",
+          "cachedResultName": "Hoja 1",
+          "cachedResultUrl": ""
+        },
+        "options": {}
+      },
+      "id": "08014979-710b-4072-9058-7c65083087f1",
+      "name": "Leer Sheet facturas",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [
+        720,
+        224
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const mensaje = $('Telegram Trigger').first().json.message.text.toLowerCase();\n\nconst meses = {\n  enero:1, febrero:2, marzo:3, abril:4, mayo:5, junio:6,\n  julio:7, agosto:8, septiembre:9, octubre:10, noviembre:11, diciembre:12\n};\n\nconst mesesNombres = ['enero','febrero','marzo','abril','mayo','junio',\n  'julio','agosto','septiembre','octubre','noviembre','diciembre'];\n\nconst añoMatch = mensaje.match(/\\d{4}/);\nconst año = añoMatch ? parseInt(añoMatch[0]) : null;\n\nlet mes = null;\nfor (const [nombre, num] of Object.entries(meses)) {\n  if (mensaje.includes(nombre)) { mes = num; break; }\n}\n\n// Parser para \"14 de abril de 2023\"\nfunction parsearFecha(str) {\n  if (!str) return null;\n  // Formato \"14 de abril de 2023\"\n  const textMatch = str.match(/(\\d{1,2}) de (\\w+) de (\\d{4})/i);\n  if (textMatch) {\n    const dia = parseInt(textMatch[1]);\n    const mesNum = meses[textMatch[2].toLowerCase()];\n    const añoNum = parseInt(textMatch[3]);\n    if (mesNum) return new Date(añoNum, mesNum - 1, dia);\n  }\n  // Formato YYYY-MM-DD como fallback\n  const isoMatch = str.match(/^(\\d{4})-(\\d{2})-(\\d{2})$/);\n  if (isoMatch) return new Date(parseInt(isoMatch[1]), parseInt(isoMatch[2])-1, parseInt(isoMatch[3]));\n  return null;\n}\n\nconst filas = $input.all().map(i => i.json);\n\nconst filtradas = filas.filter(f => {\n  const fecha = parsearFecha(f.fecha);\n  if (!fecha || isNaN(fecha)) return false;\n  const coincideAño = año ? fecha.getFullYear() === año : true;\n  const coincideMes = mes ? (fecha.getMonth() + 1) === mes : true;\n  return coincideAño && coincideMes;\n});\n\nconst totalGastado = filtradas.reduce((acc, f) => acc + (parseFloat(f.total) || 0), 0);\n\nconst porCategoria = {};\nfiltradas.forEach(f => {\n  const cat = f['categorías'] || f['categorias'] || 'Sin categoría';\n  porCategoria[cat] = (porCategoria[cat] || 0) + (parseFloat(f.total) || 0);\n});\n\nconst porProveedor = {};\nfiltradas.forEach(f => {\n  const prov = f.proveedor || 'Desconocido';\n  porProveedor[prov] = (porProveedor[prov] || 0) + (parseFloat(f.total) || 0);\n});\nconst top5Proveedores = Object.entries(porProveedor)\n  .sort((a,b) => b[1]-a[1])\n  .slice(0,5);\n\nconst porMes = {};\nfiltradas.forEach(f => {\n  const fecha = parsearFecha(f.fecha);\n  if (!fecha) return;\n  const m = fecha.getMonth() + 1;\n  porMes[m] = (porMes[m] || 0) + (parseFloat(f.total) || 0);\n});\n\nconst periodoTexto = mes\n  ? `${mesesNombres[mes-1].charAt(0).toUpperCase() + mesesNombres[mes-1].slice(1)} ${año || ''}`\n  : `Año ${año}`;\n\nreturn [{\n  json: {\n    periodo: periodoTexto,\n    totalFacturas: filtradas.length,\n    totalGastado: totalGastado.toFixed(2),\n    porCategoria,\n    top5Proveedores,\n    porMes\n  }\n}];"
+      },
+      "id": "d364067e-27a9-40e6-8012-02ff7f129f4b",
+      "name": "Filtrar y calcular datos",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        912,
+        224
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const d = $input.first().json;\n\nconst categoriasLabels = JSON.stringify(Object.keys(d.porCategoria));\nconst categoriasData = JSON.stringify(Object.values(d.porCategoria).map(v => parseFloat(v).toFixed(2)));\n\nconst provLabels = JSON.stringify(d.top5Proveedores.map(p => p[0]));\nconst provData = JSON.stringify(d.top5Proveedores.map(p => parseFloat(p[1]).toFixed(2)));\n\nconst mesesNombres = ['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'];\nconst mesesLabels = JSON.stringify(Object.keys(d.porMes).map(m => mesesNombres[m-1]));\nconst mesesData = JSON.stringify(Object.values(d.porMes).map(v => parseFloat(v).toFixed(2)));\n\nconst html = `<!DOCTYPE html>\n<html>\n<head>\n<meta charset=\"UTF-8\">\n<script src=\"https://cdn.jsdelivr.net/npm/chart.js\"><\\/script>\n<style>\n  body { font-family: Arial, sans-serif; background: #0f172a; color: white; padding: 24px; width: 900px; margin: 0; }\n  h1 { text-align: center; color: #38bdf8; font-size: 22px; margin-bottom: 20px; }\n  .kpi { display: flex; gap: 20px; justify-content: center; margin-bottom: 24px; }\n  .kpi-box { background: #1e293b; border-radius: 12px; padding: 16px 32px; text-align: center; }\n  .kpi-box .valor { display: block; font-size: 28px; font-weight: bold; color: #38bdf8; }\n  .kpi-box .label { display: block; font-size: 12px; color: #94a3b8; margin-top: 4px; }\n  .graficos { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }\n  .grafico-box { background: #1e293b; border-radius: 12px; padding: 16px; }\n  .grafico-box h3 { font-size: 13px; color: #94a3b8; margin: 0 0 12px 0; }\n  .full-width { grid-column: span 2; }\n<\\/style>\n<\\/head>\n<body>\n<h1>📊 Dashboard Financiero · ${d.periodo}<\\/h1>\n<div class=\"kpi\">\n  <div class=\"kpi-box\">\n    <span class=\"valor\">${parseFloat(d.totalGastado).toLocaleString('es-ES', {minimumFractionDigits:2})} €<\\/span>\n    <span class=\"label\">Total gastado<\\/span>\n  <\\/div>\n  <div class=\"kpi-box\">\n    <span class=\"valor\">${d.totalFacturas}<\\/span>\n    <span class=\"label\">Facturas procesadas<\\/span>\n  <\\/div>\n<\\/div>\n<div class=\"graficos\">\n  <div class=\"grafico-box\">\n    <h3>Gasto por categoría<\\/h3>\n    <canvas id=\"cat\"><\\/canvas>\n  <\\/div>\n  <div class=\"grafico-box\">\n    <h3>Top 5 proveedores<\\/h3>\n    <canvas id=\"prov\"><\\/canvas>\n  <\\/div>\n  <div class=\"grafico-box full-width\">\n    <h3>Evolución mensual<\\/h3>\n    <canvas id=\"meses\"><\\/canvas>\n  <\\/div>\n<\\/div>\n<script>\nconst colores = ['#38bdf8','#818cf8','#34d399','#fb923c','#f472b6','#facc15','#a78bfa'];\nnew Chart(document.getElementById('cat'), {\n  type: 'doughnut',\n  data: { labels: ${categoriasLabels}, datasets: [{ data: ${categoriasData}, backgroundColor: colores }] },\n  options: { plugins: { legend: { labels: { color: 'white', font: { size: 11 } } } } }\n});\nnew Chart(document.getElementById('prov'), {\n  type: 'bar',\n  data: { labels: ${provLabels}, datasets: [{ data: ${provData}, backgroundColor: '#38bdf8', borderRadius: 6 }] },\n  options: { indexAxis: 'y', plugins: { legend: { display: false } }, scales: { x: { ticks: { color: 'white' }, grid: { color: '#334155' } }, y: { ticks: { color: 'white' }, grid: { color: '#334155' } } } }\n});\nnew Chart(document.getElementById('meses'), {\n  type: 'line',\n  data: { labels: ${mesesLabels}, datasets: [{ data: ${mesesData}, borderColor: '#38bdf8', backgroundColor: 'rgba(56,189,248,0.15)', fill: true, tension: 0.4, pointBackgroundColor: '#38bdf8' }] },\n  options: { plugins: { legend: { display: false } }, scales: { x: { ticks: { color: 'white' }, grid: { color: '#334155' } }, y: { ticks: { color: 'white' }, grid: { color: '#334155' } } } }\n});\n<\\/script>\n<\\/body>\n<\\/html>`;\n\nreturn [{ json: { html } }];"
+      },
+      "id": "ac3bfdfe-6485-4c23-a6c1-547b4a2ec8bf",
+      "name": "Generar HTML dashboard",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1104,
+        224
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://hcti.io/v1/image",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "=httpBasicAuth",
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "html",
+              "value": "={{ $json.html }}"
+            },
+            {
+              "name": "viewport_width",
+              "value": "940"
+            },
+            {
+              "name": "viewport_height",
+              "value": "720"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "41ae4028-722c-4143-ab5c-e96f46f94101",
+      "name": "HTML a imagen (hcti.io)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1328,
+        224
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const d = $('Filtrar y calcular datos').first().json;\n\nconst catTexto = Object.entries(d.porCategoria)\n  .sort((a,b) => b[1]-a[1])\n  .map(([cat, val]) => `  • ${cat}: ${parseFloat(val).toFixed(2)} €`)\n  .join('\\n');\n\nconst texto = `📊 *Resumen financiero · ${d.periodo}*\n\n💶 *Total gastado:* ${parseFloat(d.totalGastado).toLocaleString('es-ES', {minimumFractionDigits:2})} €\n🧾 *Facturas procesadas:* ${d.totalFacturas}\n\n📂 *Gasto por categoría:*\n${catTexto}\n\n🏢 *Top proveedores:*\n${d.top5Proveedores.map(([p,v]) => `  • ${p}: ${parseFloat(v).toFixed(2)} €`).join('\\n')}`;\n\nreturn [{ json: { texto } }];"
+      },
+      "id": "534c747d-228e-476a-853b-79cf28af564d",
+      "name": "Generar texto resumen",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1536,
+        224
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "sendPhoto",
+        "chatId": "={{ $('Telegram Trigger').first().json.message.chat.id }}",
+        "file": "={{ $('HTML a imagen (hcti.io)').first().json.url }}",
+        "additionalFields": {
+          "caption": "={{ $json.texto }}",
+          "parse_mode": "Markdown"
+        }
+      },
+      "id": "18ad4e84-7819-459c-8cfe-731f650c137b",
+      "name": "Enviar dashboard por Telegram",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        1744,
+        224
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": false,
+            "leftValue": "",
+            "typeValidation": "loose"
+          },
+          "conditions": [
+            {
+              "id": "cond-tipo-ingreso",
+              "leftValue": "={{ $json.tipo }}",
+              "rightValue": "ingreso",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "84581a2d-0b95-49e2-87aa-a354396cde0d",
+      "name": "¿Es ingreso o gasto?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        848,
+        16
+      ]
+    },
+    {
+      "parameters": {
+        "resource": "file",
+        "fileId": "={{ $('Edit Fields').item.json.file_id }}",
+        "additionalFields": {}
+      },
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        1088,
+        -192
+      ],
+      "id": "35b15cba-5c62-40f8-9463-28d2cc4cb0c9",
+      "name": "Get file (Gasto)"
+    },
+    {
+      "parameters": {
+        "resource": "file",
+        "fileId": "={{ $('Edit Fields').item.json.file_id }}",
+        "additionalFields": {}
+      },
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        1088,
+        16
+      ],
+      "id": "2fdb9ef4-fffe-4308-9402-db0ea040b0b7",
+      "name": "Get file (Ingreso)"
+    },
+    {
+      "parameters": {
+        "name": "data",
+        "driveId": {
+          "__rl": true,
+          "value": "My Drive",
+          "mode": "list",
+          "cachedResultName": "My Drive",
+          "cachedResultUrl": "https://drive.google.com/drive/my-drive"
+        },
+        "folderId": {
+          "__rl": true,
+          "value": "YOUR_GASTOS_FOLDER_ID",
+          "mode": "list",
+          "cachedResultName": "gastos",
+          "cachedResultUrl": ""
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleDrive",
+      "typeVersion": 3,
+      "position": [
+        1328,
+        -192
+      ],
+      "id": "af8cb9ec-8fd2-4b70-8ae9-f7591f1badda",
+      "name": "Upload file (Gastos)"
+    },
+    {
+      "parameters": {
+        "name": "data",
+        "driveId": {
+          "__rl": true,
+          "value": "My Drive",
+          "mode": "list",
+          "cachedResultName": "My Drive",
+          "cachedResultUrl": "https://drive.google.com/drive/my-drive"
+        },
+        "folderId": {
+          "__rl": true,
+          "value": "YOUR_INGRESOS_FOLDER_ID",
+          "mode": "list",
+          "cachedResultName": "ingresos",
+          "cachedResultUrl": ""
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleDrive",
+      "typeVersion": 3,
+      "position": [
+        1280,
+        16
+      ],
+      "id": "9a512a4b-6bfb-480d-b41a-4f9d501c372c",
+      "name": "Upload file (Ingresos)"
+    },
+    {
+      "parameters": {
+        "updates": [
+          "message"
+        ],
+        "additionalFields": {}
+      },
+      "type": "n8n-nodes-base.telegramTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        -288,
+        224
+      ],
+      "id": "12f5b46d-8d7b-419d-baef-e0aede10aea5",
+      "name": "Telegram Trigger"
+    }
+  ],
+  "pinData": {
+    "Telegram Trigger": [
+      {
+        "json": {
+          "update_id": 0,
+          "message": {
+            "message_id": 54,
+            "from": {
+              "id": 0,
+              "is_bot": false,
+              "first_name": "Usuario",
+              "language_code": "es"
+            },
+            "chat": {
+              "id": 0,
+              "first_name": "Usuario",
+              "type": "private"
+            },
+            "date": 1773333112,
+            "text": "hazme un resumen de 2023"
+          }
+        },
+        "pairedItem": {
+          "item": 0
+        }
+      }
+    ]
+  },
+  "connections": {
+    "Edit Fields": {
+      "main": [
+        [
+          {
+            "node": "Switch",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get a file": {
+      "main": [
+        [
+          {
+            "node": "Analyze image",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Analyze image": {
+      "main": [
+        [
+          {
+            "node": "Code",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code": {
+      "main": [
+        [
+          {
+            "node": "¿Es ingreso o gasto?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Edit Fields1": {
+      "main": [
+        [
+          {
+            "node": "Append row in sheet",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Switch": {
+      "main": [
+        [
+          {
+            "node": "Get a file",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "¿Es petición de resumen?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Append row in sheet": {
+      "main": [
+        [
+          {
+            "node": "Send a text message",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "¿Es petición de resumen?": {
+      "main": [
+        [
+          {
+            "node": "Leer Sheet facturas",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Leer Sheet facturas": {
+      "main": [
+        [
+          {
+            "node": "Filtrar y calcular datos",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Filtrar y calcular datos": {
+      "main": [
+        [
+          {
+            "node": "Generar HTML dashboard",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Generar HTML dashboard": {
+      "main": [
+        [
+          {
+            "node": "HTML a imagen (hcti.io)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "HTML a imagen (hcti.io)": {
+      "main": [
+        [
+          {
+            "node": "Generar texto resumen",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Generar texto resumen": {
+      "main": [
+        [
+          {
+            "node": "Enviar dashboard por Telegram",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "¿Es ingreso o gasto?": {
+      "main": [
+        [
+          {
+            "node": "Get file (Ingreso)",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Get file (Gasto)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get file (Gasto)": {
+      "main": [
+        [
+          {
+            "node": "Upload file (Gastos)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get file (Ingreso)": {
+      "main": [
+        [
+          {
+            "node": "Upload file (Ingresos)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Upload file (Gastos)": {
+      "main": [
+        [
+          {
+            "node": "Edit Fields1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Upload file (Ingresos)": {
+      "main": [
+        [
+          {
+            "node": "Edit Fields1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Telegram Trigger": {
+      "main": [
+        [
+          {
+            "node": "Edit Fields",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "availableInMCP": false
+  },
+  "versionId": "",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": ""
+  },
+  "id": "",
+  "tags": []
+}
